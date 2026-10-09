@@ -61,22 +61,179 @@ void setActiveTab(boolean client) {
   content.removeAllViews();LinearLayout c=card();c.addView(tv("إلى أين تريد الذهاب؟",22,DARK));c.addView(tv("ابحث عن الرحلات المتاحة من قاعدة البيانات، ثم تواصل مباشرة مع السائق.",14,Color.DKGRAY));search=input("مثال: تعز");c.addView(search);Button go=btn("بحث",GREEN);c.addView(go);content.addView(c);go.setOnClickListener(v->{supa.event("search",null);renderResults(search.getText().toString().trim());});renderResults("");}
  void loadTrips(){supa.loadTrips(new SupabaseClient.Callback(){public void done(boolean ok,String body,String err){if(!ok){toast("لم يتم تحميل الرحلات: "+err);return;}try{trips.clear();JSONArray a=new JSONArray(body);for(int i=0;i<a.length();i++){JSONObject j=a.getJSONObject(i),d=j.optJSONObject("drivers");Trip t=new Trip(j.optString("id"),d==null?"سائق":"سائق: "+d.optString("name"),d==null?"":d.optString("vehicle_type"),j.optString("destination"),j.optInt("seats"),j.optInt("seats_available"),d==null?"":d.optString("phone"),d==null?"":d.optString("whatsapp"),j.optString("notes"),"available".equals(j.optString("status")));trips.add(t);}renderResults(search==null?"":search.getText().toString().trim());}catch(Exception e){toast("بيانات الرحلات غير مفهومة");}}});}
  void renderResults(String q){while(content.getChildCount()>1)content.removeViewAt(1);String s=q.toLowerCase(Locale.ROOT);if(trips.isEmpty()){content.addView(tv("لا توجد رحلات محملة حاليًا. إذا كان هناك سائق نشر رحلة ستظهر هنا.",14,Color.GRAY));return;}for(Trip t:trips){if(!s.isEmpty()&&!t.dest.toLowerCase(Locale.ROOT).contains(s))continue;LinearLayout c=card();LinearLayout top=new LinearLayout(this);top.addView(tv(t.car.isEmpty()?"مركبة":t.car,18,DARK),new LinearLayout.LayoutParams(0,-2,1));top.addView(tv(t.available?"● متوفر":"● مكتمل",13,t.available?GREEN:Color.RED));c.addView(top);c.addView(tv("📍 إلى "+t.dest,15,DARK));c.addView(tv("👤 "+t.name+"   •   💺 "+t.seats+"   •   المتبقي: "+t.left,13,Color.DKGRAY));if(!t.notes.isEmpty())c.addView(tv("📝 "+t.notes,12,Color.GRAY));LinearLayout acts=new LinearLayout(this);Button call=btn("📞 اتصال",Color.WHITE),wa=btn("💬 واتساب",GREEN);acts.addView(call,new LinearLayout.LayoutParams(0,dp(50),1));acts.addView(wa,new LinearLayout.LayoutParams(0,dp(50),1));c.addView(acts);call.setOnClickListener(v->{supa.event("call_click",t.id);dial(t.phone);});wa.setOnClickListener(v->{supa.event("whatsapp_click",t.id);whatsapp(t.wa);});content.addView(c);}}
- void showDriver(){setActiveTab(false);
-   if(supa.hasDriverSession()){showDriverHome();return;}
-   content.removeAllViews();LinearLayout c=card();c.addView(tv("حساب السائق",22,DARK));
-   EditText email=input("البريد الإلكتروني للسائق");EditText pass=input("كلمة المرور (6 أحرف أو أكثر)");pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);EditText name=input("الاسم الكامل");EditText phone=input("رقم الهاتف");EditText wa=input("رقم واتساب");EditText vehicle=input("نوع المركبة");c.addView(email);c.addView(pass);c.addView(name);c.addView(phone);c.addView(wa);c.addView(vehicle);
-   LinearLayout actions=new LinearLayout(this);Button signup=btn("إنشاء حساب",GREEN),login=btn("تسجيل الدخول",Color.WHITE);actions.addView(signup,new LinearLayout.LayoutParams(0,dp(52),1));actions.addView(login,new LinearLayout.LayoutParams(0,dp(52),1));c.addView(actions);content.addView(c);
-   signup.setOnClickListener(v->{if (email.getText().toString().trim().isEmpty()
-        || pass.getText().toString().length() < 6
-        || name.getText().toString().trim().isEmpty()
-        || phone.getText().toString().trim().isEmpty()
-        || wa.getText().toString().trim().isEmpty()
-        || vehicle.getText().toString().trim().isEmpty()) {
-    toast("يرجى تعبئة جميع الحقول، وكلمة المرور يجب أن تكون 6 أحرف على الأقل");
-    return;
-}supa.signUpDriver(email.getText().toString().trim(),pass.getText().toString(),(ok,body,err)->{if(!ok){toast("فشل إنشاء الحساب: "+err);return;}supa.saveDriver(name.getText().toString().trim(),phone.getText().toString().trim(),wa.getText().toString().trim(),vehicle.getText().toString().trim(),(x,y,z)->{if(!x){toast("تم إنشاء الحساب لكن تعذر حفظ بيانات السائق: "+z);return;}toast("تم إنشاء حساب السائق بنجاح");showDriverHome();});});});
-   login.setOnClickListener(v->{supa.signInDriver(email.getText().toString().trim(),pass.getText().toString(),(ok,body,err)->{if(!ok){toast("فشل تسجيل الدخول: "+err);return;}showDriverHome();});});
- }
+ void showDriver() {
+    setActiveTab(false);
+
+    if (supa.hasDriverSession()) {
+        showDriverHome();
+        return;
+    }
+
+    showDriverAuth(false);
+}
+
+void showDriverAuth(boolean loginMode) {
+    setActiveTab(false);
+    content.removeAllViews();
+
+    LinearLayout c = card();
+    c.addView(tv(
+            loginMode ? "تسجيل دخول السائق" : "إنشاء حساب سائق",
+            22, DARK
+    ));
+
+    // التبديل بين التسجيل وتسجيل الدخول
+    LinearLayout modes = new LinearLayout(this);
+
+    Button signupMode = btn("إنشاء حساب", Color.WHITE);
+    Button loginModeBtn = btn("تسجيل الدخول", Color.WHITE);
+
+    signupMode.setBackgroundColor(
+            loginMode ? Color.WHITE : GREEN
+    );
+    signupMode.setTextColor(
+            loginMode ? DARK : Color.WHITE
+    );
+
+    loginModeBtn.setBackgroundColor(
+            loginMode ? GREEN : Color.WHITE
+    );
+    loginModeBtn.setTextColor(
+            loginMode ? Color.WHITE : DARK
+    );
+
+    modes.addView(signupMode,
+            new LinearLayout.LayoutParams(0, dp(50), 1));
+    modes.addView(loginModeBtn,
+            new LinearLayout.LayoutParams(0, dp(50), 1));
+
+    c.addView(modes);
+
+    EditText email = input("البريد الإلكتروني");
+    EditText pass = input("كلمة المرور");
+    pass.setInputType(
+            InputType.TYPE_CLASS_TEXT |
+            InputType.TYPE_TEXT_VARIATION_PASSWORD
+    );
+
+    c.addView(email);
+    c.addView(pass);
+
+    EditText name = null;
+    EditText phone = null;
+    EditText wa = null;
+    EditText vehicle = null;
+
+    if (!loginMode) {
+        name = input("الاسم الكامل");
+        phone = input("رقم الهاتف");
+        wa = input("رقم واتساب");
+        vehicle = input("نوع المركبة");
+
+        c.addView(name);
+        c.addView(phone);
+        c.addView(wa);
+        c.addView(vehicle);
+    }
+
+    Button submit = btn(
+            loginMode ? "دخول إلى حسابي" : "إنشاء الحساب",
+            GREEN
+    );
+    c.addView(submit);
+    content.addView(c);
+
+    signupMode.setOnClickListener(v ->
+            showDriverAuth(false)
+    );
+
+    loginModeBtn.setOnClickListener(v ->
+            showDriverAuth(true)
+    );
+
+    final EditText driverName = name;
+    final EditText driverPhone = phone;
+    final EditText driverWa = wa;
+    final EditText driverVehicle = vehicle;
+
+    submit.setOnClickListener(v -> {
+        String em = email.getText().toString().trim();
+        String pw = pass.getText().toString();
+
+        if (em.isEmpty() || pw.isEmpty()) {
+            toast("أدخل البريد الإلكتروني وكلمة المرور");
+            return;
+        }
+
+        if (loginMode) {
+            supa.signInDriver(em, pw, (ok, body, err) -> {
+                if (!ok) {
+                    toast("تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.");
+                    return;
+                }
+
+                supa.loadMyDriver((found, data, loadErr) -> {
+                    if (!found) {
+                        toast("تم الدخول، لكن تعذر تحميل بيانات السائق.");
+                        return;
+                    }
+
+                    try {
+                        JSONArray arr = new JSONArray(data);
+
+                        if (arr.length() == 0) {
+                            toast("تم الدخول، لكن لا توجد بيانات سائق مرتبطة بهذا الحساب.");
+                            showDriverAuth(false);
+                            return;
+                        }
+
+                        showDriverHome();
+                    } catch (Exception e) {
+                        toast("تعذر قراءة بيانات السائق.");
+                    }
+                });
+            });
+            return;
+        }
+
+        if (pw.length() < 6
+                || driverName.getText().toString().trim().isEmpty()
+                || driverPhone.getText().toString().trim().isEmpty()
+                || driverWa.getText().toString().trim().isEmpty()
+                || driverVehicle.getText().toString().trim().isEmpty()) {
+            toast("يرجى تعبئة جميع الحقول، وكلمة المرور 6 أحرف على الأقل");
+            return;
+        }
+
+        supa.signUpDriver(em, pw, (ok, body, err) -> {
+            if (!ok) {
+                toast("فشل إنشاء الحساب: " + err);
+                return;
+            }
+
+            supa.saveDriver(
+                    driverName.getText().toString().trim(),
+                    driverPhone.getText().toString().trim(),
+                    driverWa.getText().toString().trim(),
+                    driverVehicle.getText().toString().trim(),
+                    (saved, response, saveErr) -> {
+                        if (!saved) {
+                            toast("تم إنشاء الحساب لكن تعذر حفظ بيانات السائق: " + saveErr);
+                            return;
+                        }
+
+                        if (supa.hasDriverSession()) {
+                            toast("تم إنشاء الحساب بنجاح");
+                            showDriverHome();
+                        } else {
+                            toast("تم إنشاء الحساب. سجّل الدخول للمتابعة.");
+                            showDriverAuth(true);
+                        }
+                    }
+            );
+        });
+    });
+}
  void showDriverHome(){content.removeAllViews();
    LinearLayout head=card();head.addView(tv("لوحة السائق",23,DARK));head.addView(tv("إدارة الحساب والرحلات من مكان واحد.",14,Color.DKGRAY));
    Button profile=btn("👤 حسابي وتعديل بياناتي",Color.WHITE), tripsBtn=btn("🚗 رحلاتي",Color.WHITE), logout=btn("تسجيل الخروج",Color.WHITE);head.addView(profile);head.addView(tripsBtn);head.addView(logout);content.addView(head);
