@@ -35,7 +35,7 @@ void setActiveTab(boolean client) {
     LinearLayout tabs = new LinearLayout(this);
     tabs.setPadding(0, dp(12), 0, dp(4));
 
-    clientTab = btn("أنا عميل", GREEN);
+    clientTab = btn("أنا زبون", GREEN);
     driverTab = btn("أنا سائق", Color.WHITE);
 
     tabs.addView(clientTab,
