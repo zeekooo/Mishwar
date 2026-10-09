@@ -59,7 +59,15 @@ public class SupabaseClient {
             if (access.isEmpty()) return "";
             String[] p=access.split("\\.");
             if(p.length<2)return "";
-            String payload=new String(Base64.getUrlDecoder().decode(p[1]), StandardCharsets.UTF_8);
+            String payload = new String(
+    android.util.Base64.decode(
+        p[1],
+        android.util.Base64.URL_SAFE
+            | android.util.Base64.NO_WRAP
+            | android.util.Base64.NO_PADDING
+    ),
+    java.nio.charset.StandardCharsets.UTF_8
+    );
             return new JSONObject(payload).optString("sub","");
         } catch(Exception e){return "";}
     }
