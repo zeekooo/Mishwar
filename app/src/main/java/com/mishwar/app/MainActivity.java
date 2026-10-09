@@ -205,33 +205,50 @@ void showDriverAuth(boolean loginMode) {
             return;
         }
 
-        supa.signUpDriver(em, pw, (ok, body, err) -> {
-            if (!ok) {
-                toast("فشل إنشاء الحساب: " + err);
-                return;
-            }
+        
+supa.signUpDriver(em, pw, (ok, body, err) -> {
+    if (!ok) {
+        toast("فشل إنشاء الحساب: " + err);
+        return;
+    }
 
-            supa.saveDriver(
-                    driverName.getText().toString().trim(),
-                    driverPhone.getText().toString().trim(),
-                    driverWa.getText().toString().trim(),
-                    driverVehicle.getText().toString().trim(),
-                    (saved, response, saveErr) -> {
-                        if (!saved) {
-                            toast("تم إنشاء الحساب لكن تعذر حفظ بيانات السائق: " + saveErr);
+    supa.saveDriver(
+            driverName.getText().toString().trim(),
+            driverPhone.getText().toString().trim(),
+            driverWa.getText().toString().trim(),
+            driverVehicle.getText().toString().trim(),
+            (saved, response, saveErr) -> {
+                if (!saved) {
+                    toast("تعذر حفظ بيانات السائق: " + saveErr);
+                    return;
+                }
+
+                supa.loadMyDriver((found, data, loadErr) -> {
+                    if (!found) {
+                        toast("تم التسجيل، لكن تعذر تحميل بيانات السائق: " + loadErr);
+                        return;
+                    }
+
+                    try {
+                        org.json.JSONArray drivers =
+                                new org.json.JSONArray(data);
+
+                        if (drivers.length() == 0) {
+                            toast("لم يتم العثور على بيانات السائق");
                             return;
                         }
 
-                        if (supa.hasDriverSession()) {
-                            toast("تم إنشاء الحساب بنجاح");
-                            showDriverHome();
-                        } else {
-                            toast("تم إنشاء الحساب. سجّل الدخول للمتابعة.");
-                            showDriverAuth(true);
-                        }
+                        toast("تم إنشاء الحساب بنجاح");
+                        showDriverHome();
+
+                    } catch (Exception e) {
+                        toast("تعذر قراءة بيانات السائق");
                     }
-            );
-        });
+                });
+            }
+    );
+});
+
     });
 }
  void showDriverHome(){content.removeAllViews();
